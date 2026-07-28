@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-950 text-gray-100 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-stellar-500 to-stellar-600 text-white font-semibold rounded-xl 
+           hover:from-stellar-400 hover:to-stellar-500 active:scale-[0.98] transition-all duration-200 
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100
+           shadow-lg shadow-stellar-500/20;
+  }
+
+  .btn-secondary {
+    @apply px-6 py-3 bg-gray-800 text-gray-200 font-semibold rounded-xl 
+           hover:bg-gray-700 active:scale-[0.98] transition-all duration-200 
+           border border-gray-700 hover:border-gray-600
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  .card {
+    @apply bg-gray-900/60 backdrop-blur-sm rounded-2xl border border-gray-800 p-6 
+           shadow-xl shadow-black/20;
+  }
+
+  .card-hover {
+    @apply card hover:border-gray-700 hover:bg-gray-900/80 transition-all duration-300;
+  }
+
+  .input-field {
+    @apply w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-xl text-gray-100 
+           placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-stellar-500/50 focus:border-stellar-500
+           transition-all duration-200;
+  }
+
+  .badge {
+    @apply px-3 py-1 rounded-full text-xs font-medium;
+  }
+
+  .badge-active {
+    @apply badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+  }
+
+  .badge-pending {
+    @apply badge bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  .badge-failed {
+    @apply badge bg-red-500/20 text-red-400 border border-red-500/30;
+  }
+
+  .badge-settled {
+    @apply badge bg-gray-600/20 text-gray-400 border border-gray-600/30;
+  }
+
+  .progress-bar {
+    @apply h-2 bg-gray-800 rounded-full overflow-hidden;
+  }
+
+  .progress-fill {
+    @apply h-full bg-gradient-to-r from-stellar-500 to-stellar-400 rounded-full transition-all duration-500 ease-out;
+  }
+}

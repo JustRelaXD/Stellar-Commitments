@@ -1,0 +1,22 @@
+# Rust / Contract
+contract/target/
+contract/Cargo.lock
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Stellar CLI
+.config/
