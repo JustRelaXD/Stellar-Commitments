@@ -1,5 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useWallet } from './hooks/useWallet';
+import { useContract } from './hooks/useContract';
 import { WalletConnect } from './components/WalletConnect';
 import { CreateVault } from './components/CreateVault';
 import { VaultList } from './components/VaultList';
@@ -7,32 +8,94 @@ import { EventFeed } from './components/EventFeed';
 import { TxStatus } from './components/TxStatus';
 import { Leaderboard } from './components/Leaderboard';
 import { GlobalStatsBar } from './components/GlobalStats';
-// Contract addresses available via env vars (see constants.ts)
 import type { Vault, ContractEvent, GlobalStats, TxState } from './types';
 import { getDemoEvents } from './utils/contract';
 
-const DEMO_USER = 'GAXHJ7WJ7P3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X3X';
-
 function App() {
   const { wallet, error, isConnecting, connect, disconnect, signTransaction } = useWallet();
+  const contract = useContract(wallet.address, signTransaction);
 
-  // Demo state
-  const [demoVaults, setDemoVaults] = useState<{ id: number; data: Vault }[]>([]);
-  const [demoEvents, setDemoEvents] = useState<ContractEvent[]>([]);
-  const [demoStats, setDemoStats] = useState<GlobalStats>({
+  // ── State ──────────────────────────────────────────────────────────
+  const [vaults, setVaults] = useState<{ id: number; data: Vault }[]>([]);
+  const [events, setEvents] = useState<ContractEvent[]>([]);
+  const [stats, setStats] = useState<GlobalStats>({
     total_vaults: 0,
     total_completed: 0,
     total_staked: 0,
     total_donated: 0,
   });
-  const [demoLeaderboard, setDemoLeaderboard] = useState<{ address: string; completed: number; totalStaked: number; totalReturned: number }[]>([]);
-
-  const [txState, setTxState] = useState<TxState>({ status: 'idle' });
+  const [leaderboard, setLeaderboard] = useState<
+    { address: string; completed: number; totalStaked: number; totalReturned: number }[]
+  >([]);
   const [isLoadingVaults, setIsLoadingVaults] = useState(false);
+  const [contractAvailable, setContractAvailable] = useState(true);
+  const loadedRef = useRef(false);
 
-  // Add demo events on mount
+  // Seed demo events once
   useEffect(() => {
-    setDemoEvents(getDemoEvents());
+    if (events.length === 0) {
+      setEvents(getDemoEvents());
+    }
+  }, []);
+
+  // ── Load data from contract ────────────────────────────────────────
+  const loadData = useCallback(async () => {
+    if (!wallet.isConnected || !wallet.address) return;
+    setIsLoadingVaults(true);
+
+    try {
+      // Load global stats
+      const gs = await contract.getGlobalStats();
+      setStats(gs);
+      setContractAvailable(true);
+
+      // Load user's vault IDs
+      const vaultIds = await contract.getUserVaults(wallet.address);
+      if (vaultIds.length > 0) {
+        const vaultPromises = vaultIds.map((id: number) =>
+          contract.getVault(id).catch(() => null)
+        );
+        const results = await Promise.all(vaultPromises);
+        setVaults(results.filter((v): v is { id: number; data: Vault } => v !== null));
+      } else {
+        setVaults([]);
+      }
+
+      // Load user stats for leaderboard
+      try {
+        const userStats = await contract.getUserStats(wallet.address);
+        setLeaderboard([{
+          address: wallet.address,
+          completed: userStats.completed_vaults,
+          totalStaked: userStats.total_staked,
+          totalReturned: userStats.total_returned,
+        }]);
+      } catch {
+        // Stats not critical
+      }
+    } catch (err: unknown) {
+      console.warn('Failed to load contract data (contract might not be deployed yet):', err);
+      setContractAvailable(false);
+    } finally {
+      setIsLoadingVaults(false);
+    }
+  }, [wallet.isConnected, wallet.address, contract]);
+
+  // Load data when wallet connects
+  useEffect(() => {
+    if (wallet.isConnected && wallet.address && !loadedRef.current) {
+      loadedRef.current = true;
+      loadData();
+    }
+    if (!wallet.isConnected) {
+      loadedRef.current = false;
+    }
+  }, [wallet.isConnected, wallet.address, loadData]);
+
+  // ── Handlers ───────────────────────────────────────────────────────
+
+  const addEvent = useCallback((type: ContractEvent['type'], data: any) => {
+    setEvents(prev => [{ type, data, timestamp: Date.now() }, ...prev]);
   }, []);
 
   const handleCreateVault = useCallback(async (
@@ -42,126 +105,59 @@ function App() {
     stake: number,
   ) => {
     if (!wallet.isConnected) {
-      setTxState({ status: 'failed', error: 'Wallet not connected' });
       throw new Error('Wallet not connected');
     }
 
-    setTxState({ status: 'pending' });
-
-    // Simulate creating a vault for demo
-    const newVault: Vault = {
-      owner: wallet.address,
-      description,
-      required_check_ins: checkIns,
-      check_in_count: 0,
-      deadline: Math.floor(Date.now() / 1000) + days * 86400,
-      stake,
-      settled: false,
-    };
-
-    const newId = demoVaults.length + 1;
-    setDemoVaults(prev => [...prev, { id: newId, data: newVault }]);
-    setDemoStats(prev => ({
-      ...prev,
-      total_vaults: prev.total_vaults + 1,
-      total_staked: prev.total_staked + stake,
-    }));
-    setDemoEvents(prev => [{
-      type: 'vault_created',
-      data: { vault_id: newId, stake, required: checkIns, deadline: newVault.deadline, owner: wallet.address },
-      timestamp: Date.now(),
-    }, ...prev]);
-
-    // Simulate tx delay
-    await new Promise(r => setTimeout(r, 1500));
-    setTxState({ status: 'success', hash: `demo_tx_create_${newId}` });
-  }, [wallet, demoVaults]);
+    try {
+      const vaultId = await contract.createVault(description, days, checkIns, stake);
+      addEvent('vault_created', {
+        vault_id: vaultId,
+        stake,
+        required: checkIns,
+        deadline: Math.floor(Date.now() / 1000) + days * 86400,
+        owner: wallet.address,
+      });
+      // Refresh vaults & stats
+      await loadData();
+    } catch (err: unknown) {
+      if (err instanceof Error) throw err;
+      throw new Error('Failed to create vault');
+    }
+  }, [wallet, contract, addEvent, loadData]);
 
   const handleCheckIn = useCallback(async (vaultId: number) => {
-    if (!wallet.isConnected) {
-      setTxState({ status: 'failed', error: 'Wallet not connected' });
-      throw new Error('Wallet not connected');
+    if (!wallet.isConnected) throw new Error('Wallet not connected');
+
+    try {
+      await contract.checkIn(vaultId);
+      addEvent('checked_in', {
+        vault_id: vaultId,
+        owner: wallet.address,
+      });
+      await loadData();
+    } catch (err: unknown) {
+      if (err instanceof Error) throw err;
+      throw new Error('Failed to check in');
     }
-
-    setTxState({ status: 'pending' });
-
-    const vaultIndex = demoVaults.findIndex(v => v.id === vaultId);
-    if (vaultIndex === -1) {
-      setTxState({ status: 'failed', error: 'Vault not found' });
-      return;
-    }
-
-    // Simulate check-in
-    setDemoVaults(prev => prev.map((v, i) => {
-      if (i === vaultIndex) {
-        const newCount = v.data.check_in_count + 1;
-        const completed = newCount >= v.data.required_check_ins;
-        if (completed) {
-          setDemoStats(s => ({
-            ...s,
-            total_completed: s.total_completed + 1,
-          }));
-          setDemoLeaderboard(l => {
-            const existing = l.find(e => e.address === wallet.address);
-            if (existing) {
-              return l.map(e => e.address === wallet.address
-                ? { ...e, completed: e.completed + 1, totalReturned: e.totalReturned + v.data.stake }
-                : e
-              );
-            }
-            return [...l, { address: wallet.address, completed: 1, totalStaked: v.data.stake, totalReturned: v.data.stake }];
-          });
-        }
-        return { ...v, data: { ...v.data, check_in_count: newCount } };
-      }
-      return v;
-    }));
-
-    setDemoEvents(prev => [{
-      type: 'checked_in',
-      data: { vault_id: vaultId, count: demoVaults[vaultIndex].data.check_in_count + 1, required: demoVaults[vaultIndex].data.required_check_ins, owner: wallet.address },
-      timestamp: Date.now(),
-    }, ...prev]);
-
-    await new Promise(r => setTimeout(r, 1000));
-    setTxState({ status: 'success', hash: `demo_tx_check_${vaultId}` });
-  }, [wallet, demoVaults]);
+  }, [wallet, contract, addEvent, loadData]);
 
   const handleSettle = useCallback(async (vaultId: number) => {
-    if (!wallet.isConnected) {
-      setTxState({ status: 'failed', error: 'Wallet not connected' });
-      throw new Error('Wallet not connected');
+    if (!wallet.isConnected) throw new Error('Wallet not connected');
+
+    try {
+      await contract.settleVault(vaultId);
+      addEvent('vault_settled', {
+        vault_id: vaultId,
+        owner: wallet.address,
+      });
+      await loadData();
+    } catch (err: unknown) {
+      if (err instanceof Error) throw err;
+      throw new Error('Failed to settle vault');
     }
+  }, [wallet, contract, addEvent, loadData]);
 
-    setTxState({ status: 'pending' });
-
-    setDemoVaults(prev => prev.map(v => {
-      if (v.id === vaultId) {
-        const returned = (v.data.stake * v.data.check_in_count) / v.data.required_check_ins;
-        const donated = v.data.stake - returned;
-        setDemoStats(s => ({
-          ...s,
-          total_donated: s.total_donated + donated,
-        }));
-        return { ...v, data: { ...v.data, settled: true } };
-      }
-      return v;
-    }));
-
-    setDemoEvents(prev => [{
-      type: 'vault_settled',
-      data: { vault_id: vaultId, owner: wallet.address, returned: Math.floor(vaultId * 10 / 7), donated: vaultId * 10 - Math.floor(vaultId * 10 / 7) },
-      timestamp: Date.now(),
-    }, ...prev]);
-
-    await new Promise(r => setTimeout(r, 1000));
-    setTxState({ status: 'success', hash: `demo_tx_settle_${vaultId}` });
-  }, [wallet]);
-
-  const resetTx = useCallback(() => setTxState({ status: 'idle' }), []);
-
-  // Replace with a real address for the demo
-  const demoAddress = wallet.isConnected ? wallet.address : DEMO_USER;
+  const userAddress = wallet.isConnected ? wallet.address : '';
 
   return (
     <div className="min-h-screen bg-gray-950">
@@ -189,8 +185,26 @@ function App() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {/* Contract not available warning */}
+        {!contractAvailable && wallet.isConnected && (
+          <div className="card border-2 border-amber-500/30 bg-amber-500/5">
+            <div className="flex items-center gap-3 text-amber-400">
+              <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span>
+                Cannot reach contract{' '}
+                <code className="text-xs bg-gray-800 px-1.5 py-0.5 rounded">
+                  {import.meta.env.VITE_CONTRACT_ADDRESS || 'Not set'}
+                </code>
+                . Make sure it's deployed and your <code className="text-xs bg-gray-800 px-1.5 py-0.5 rounded">.env</code> is correct.
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Global stats */}
-        <GlobalStatsBar stats={demoStats} userCompleted={0} />
+        <GlobalStatsBar stats={stats} userCompleted={0} />
 
         {/* Main grid */}
         <div className="grid lg:grid-cols-3 gap-8">
@@ -211,10 +225,16 @@ function App() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                 </svg>
                 Your Vaults
+                {isLoadingVaults && (
+                  <svg className="w-4 h-4 text-stellar-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                )}
               </h2>
               <VaultList
-                vaults={demoVaults.filter(v => v.data.owner === demoAddress)}
-                userAddress={demoAddress}
+                vaults={vaults}
+                userAddress={userAddress}
                 onCheckIn={handleCheckIn}
                 onSettle={handleSettle}
                 isLoading={isLoadingVaults}
@@ -225,10 +245,10 @@ function App() {
           {/* Right column: Event feed + Leaderboard */}
           <div className="space-y-6">
             <EventFeed
-              events={demoEvents}
-              userAddress={demoAddress}
+              events={events}
+              userAddress={userAddress}
             />
-            <Leaderboard entries={demoLeaderboard} />
+            <Leaderboard entries={leaderboard} />
           </div>
         </div>
 
@@ -242,12 +262,18 @@ function App() {
             <span>|</span>
             <span>Contract: {import.meta.env.VITE_CONTRACT_ADDRESS || 'Not deployed'}</span>
           </div>
-          <span className="text-xs">Stellar Vault v0.1.0</span>
+          <button
+            onClick={loadData}
+            disabled={!wallet.isConnected}
+            className="text-xs text-stellar-400 hover:text-stellar-300 transition-colors disabled:opacity-30"
+          >
+            Refresh
+          </button>
         </div>
       </main>
 
       {/* Transaction status toast */}
-      <TxStatus tx={txState} onDismiss={resetTx} />
+      <TxStatus tx={contract.txState} onDismiss={contract.resetTx} />
     </div>
   );
 }
