@@ -8,11 +8,11 @@ export const RPC_URL = import.meta.env.VITE_RPC_URL || 'https://soroban-testnet.
 
 // Native XLM token address on testnet
 // This is the Stellar Asset Contract for XLM on testnet
-export const XLM_TOKEN_ADDRESS = import.meta.env.VITE_XLM_TOKEN_ADDRESS || 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2Q2ATQ5IX6H4ZQG3G';
+export const XLM_TOKEN_ADDRESS = import.meta.env.VITE_XLM_TOKEN_ADDRESS || 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
-// Charity address that receives slashed funds
-// Replace with a real charity testnet address after deployment
-export const CHARITY_ADDRESS = import.meta.env.VITE_CHARITY_ADDRESS || 'GANOG5IK7CRZQF6YRF5SKCU7ZFSZR4H5XVF2QF3K4HXF2QF3K4HXF2QF3';
+// Contract address (v3 - with burn address support)
+export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || 'CDLIRSHZJIA22GDE7M7JJ2PAUJ3OTLRH2UTVNXAGYSK3O5X4IXFIEZTC';
 
-// Contract address - UPDATE THIS AFTER DEPLOYMENT
-export const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
+// Stellar null/burn address — all zeros, no one knows the private key.
+// Slashed XLM sent here stays in the contract, effectively burned.
+export const BURN_ADDRESS = 'GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF';

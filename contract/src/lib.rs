@@ -15,6 +15,8 @@ pub struct Vault {
     pub deadline: u64,
     pub stake: i128,
     pub settled: bool,
+    pub beneficiary: Address,
+    pub strict_penalty: bool,
 }
 
 #[contracttype]
@@ -69,6 +71,16 @@ fn emit_vault_settled(env: &Env, vault_id: u32, owner: &Address, returned: i128,
     );
 }
 
+/// Check if an address is the well-known Stellar null/burn address.
+/// The all-zeros account — no one knows its private key.
+fn is_burn_address(env: &Env, addr: &Address) -> bool {
+    let burn = Address::from_string(&String::from_str(
+        env,
+        "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWHF",
+    ));
+    addr == &burn
+}
+
 // ---- Contract ----
 
 #[contract]
@@ -86,6 +98,8 @@ impl VaultContract {
         required_check_ins: u32,
         deadline: u64,
         stake: i128,
+        beneficiary: Address,
+        strict_penalty: bool,
     ) -> u32 {
         // Validate inputs
         if required_check_ins == 0 {
@@ -122,6 +136,8 @@ impl VaultContract {
             deadline,
             stake,
             settled: false,
+            beneficiary,
+            strict_penalty,
         };
 
         // Store vault
@@ -224,10 +240,11 @@ impl VaultContract {
     }
 
     /// Settle a vault after the deadline.
-    /// Proportional slashing: (check_ins / required) * stake returned to owner,
-    /// rest donated to charity.
+    /// Two modes:
+    ///   1. Default (proportional): returned = stake * check_ins / required, rest to beneficiary
+    ///   2. Strict penalty: if check_ins < 50% of required, ALL stake goes to beneficiary
     /// Anyone can call this after the deadline.
-    pub fn settle_vault(env: Env, vault_id: u32, token: Address, charity: Address) {
+    pub fn settle_vault(env: Env, vault_id: u32, token: Address) {
         let mut vault: Vault = env
             .storage()
             .instance()
@@ -246,20 +263,28 @@ impl VaultContract {
             .instance()
             .set(&DataKey::Vault(vault_id), &vault);
 
-        // Calculate proportional return
-        // Note: integer division, so there may be a tiny remainder dust
-        let returned = (vault.stake * vault.check_in_count as i128) / vault.required_check_ins as i128;
-        let donated = vault.stake - returned;
+        // Determine return vs. donate based on penalty mode
+        let (returned, donated) = if vault.strict_penalty
+            && (vault.check_in_count as i128) * 100 < (vault.required_check_ins as i128) * 50
+        {
+            // Strict penalty: below 50% check-ins → everything to beneficiary
+            (0i128, vault.stake)
+        } else {
+            // Proportional: stake * (check_ins / required)
+            let r = (vault.stake * vault.check_in_count as i128) / vault.required_check_ins as i128;
+            (r, vault.stake - r)
+        };
 
-        // Transfer returned stake to owner (if any)
         let token_client = token::Client::new(&env, &token);
         if returned > 0 {
             token_client.transfer(&env.current_contract_address(), &vault.owner, &returned);
         }
 
-        // Transfer donated stake to charity (if any)
-        if donated > 0 {
-            token_client.transfer(&env.current_contract_address(), &charity, &donated);
+        // Transfer donated stake to beneficiary (if any)
+        // Skip if beneficiary is the burn address (null account) — funds stay
+        // in the contract, unreachable by anyone, effectively burned.
+        if donated > 0 && !is_burn_address(&env, &vault.beneficiary) {
+            token_client.transfer(&env.current_contract_address(), &vault.beneficiary, &donated);
         }
 
         // Update user stats

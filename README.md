@@ -1,60 +1,63 @@
-# Stellar Vault 🔒
+# Stellar Commitment 🔒
 
 **On-chain Commitment Savings on Stellar**
 
-Stellar Vault is a decentralized accountability platform where users stake XLM on their goals. Complete your check-ins to get your stake back. Miss some? The unearned portion is proportionally slashed and donated to charity.
+Stellar Commitment is a decentralized accountability app: you stake XLM on a goal, then prove your progress with on-chain check-ins before a deadline. Complete enough check-ins and your stake comes back. Miss your target and the unearned portion is slashed - sent to a beneficiary you choose, or burned if you leave it blank.
 
 ## ✨ Features
 
-- **Create Vaults** — Set a goal, stake XLM, define check-in requirements and deadline
-- **Daily Check-ins** — Prove commitment with on-chain transactions
-- **Proportional Slashing** — Complete X of Y check-ins → get (X/Y) * stake back, rest goes to charity
-- **Real-time Event Feed** — Watch vault creations, check-ins, and settlements as they happen
-- **Multi-wallet Support** — Connect with Freighter, Lobstr, Albedo, and more via StellarWalletsKit
-- **Transaction Status** — Pending / success / failed toast notifications for every action
-- **Leaderboard** — Top vault completers ranked by completed goals
-- **Global Stats** — Total vaults created, completed, staked, and donated
+- **Create Commitments** - Set a goal, stake XLM, pick a duration (minutes, hours, or days), and define how many check-ins prove you stuck with it
+- **On-chain Check-ins** - Prove commitment with verifiable transactions
+- **Proportional Slashing** - Complete X of Y check-ins to get (X/Y) of your stake back; the rest is slashed
+- **Strict Penalty Mode** - Optional. Below 50% check-ins and your *entire* stake is slashed
+- **Burn or Beneficiary** - Leave the beneficiary blank and slashed XLM is burned (stays in the contract, unreachable by anyone). Add a friend's address and it goes to them
+- **Multi-wallet Support** - Freighter, Lobstr, Albedo, Rabet, xBull, Hana and more via StellarWalletsKit
+- **Transaction Status** - Pending / success / failed toasts with explorer links for every action
+- **Activity Feed** - Watch commitment creations, check-ins, and settlements with transaction hashes
+- **Your Stats** - Per-wallet stats (commitments, completed, check-ins, staked, returned) - switch wallets and the numbers change
+- **Full Transparency** - "More Details" on every commitment: contract address, owner, beneficiary, create/check-in/settle transaction hashes, live contract balance, and the exact settlement breakdown (returned vs. slashed vs. burned)
 
 ## 📋 Requirements
 
 | Requirement | Status |
 |---|---|
-| 3+ error types handled | ✅ Wallet not found, tx rejected, insufficient balance, vault not found, deadline passed, already checked in |
-| Contract deployed on testnet | ✅ See [Deployment](#deployment) |
+| 3+ error types handled | ✅ Wallet not detected, tx rejected by user, insufficient balance, vault not found, deadline passed, already settled |
+| Contract deployed on testnet | ✅ See [Deployed Contract](#deployed-contract) |
 | Contract called from frontend | ✅ Via `@stellar/stellar-sdk` |
 | Transaction status visible | ✅ Toast with pending/success/failed states |
 | 2+ meaningful commits | ✅ See git log |
 | Multi-wallet integration | ✅ StellarWalletsKit (Freighter, Lobstr, Albedo, Rabet, xBull, Hana) |
-| Real-time event integration | ✅ Events streamed via contract emission + reflection in UI |
+| Real-time event integration | ✅ Activity feed reflects on-chain events with verifiable tx hashes |
 
 ## 🏗 Architecture
 
 ```
 stellar-vault/
-├── contract/            # Soroban smart contract (Rust)
+├── contract/                # Soroban smart contract (Rust)
 │   ├── Cargo.toml
 │   ├── src/
-│   │   └── lib.rs       # Vault contract logic
-│   └── target/          # Compiled WASM
-└── frontend/            # React + Vite + TypeScript
-    ├── src/
-    │   ├── App.tsx            # Main app with demo state management
-    │   ├── constants.ts       # Network, contract addresses
-    │   ├── types.ts           # TypeScript interfaces
-    │   ├── hooks/
-    │   │   └── useWallet.ts   # StellarWalletsKit integration
-    │   ├── utils/
-    │   │   └── contract.ts    # Contract client helpers
-    │   └── components/
-    │       ├── WalletConnect   # Wallet connection button
-    │       ├── CreateVault     # Vault creation form
-    │       ├── VaultCard       # Individual vault display
-    │       ├── VaultList       # Filterable vault list
-    │       ├── EventFeed       # Real-time activity feed
-    │       ├── Leaderboard     # Top completers ranking
-    │       ├── GlobalStats     # Global statistics cards
-    │       └── TxStatus        # Transaction status toast
-    └── package.json
+│   │   └── lib.rs           # Commitment (vault) contract logic
+│   └── target/              # Compiled WASM (wasm32v1-none)
+└── frontend/                # React + Vite + TypeScript
+    ├── .env.example         # Env var template
+    └── src/
+        ├── main.tsx         # App entry point
+        ├── App.tsx          # Main app: state, data loading, modals
+        ├── constants.ts     # Network, contract + token addresses, burn address
+        ├── types.ts         # TypeScript interfaces
+        ├── index.css        # Tailwind + design tokens
+        ├── hooks/
+        │   ├── useWallet.ts     # StellarWalletsKit integration + persistence
+        │   └── useContract.ts   # RPC read/write, tx simulation, signing, polling
+        └── components/
+            ├── WalletConnect    # Connect/disconnect button
+            ├── CreateVault      # Create Commitment form (duration, check-ins, stake, options)
+            ├── VaultCard        # Commitment card with progress + More Details
+            ├── VaultList        # Your commitments list
+            ├── EventFeed        # Activity feed
+            ├── UserStatsBar     # Per-wallet "Your Stats" row
+            ├── OnboardingModal  # First-visit intro (How it works)
+            └── TxStatus         # Transaction status toast
 ```
 
 ## 🚀 Quick Start
@@ -62,9 +65,9 @@ stellar-vault/
 ### Prerequisites
 
 - Node.js v18+
-- Rust (rustc + cargo)
-- Stellar CLI (`stellar`) — for contract deployment
-- A Stellar testnet account funded via [Friendbot](https://friendbot.stellar.org)
+- Rust (rustc + cargo) with the `wasm32v1-none` target (`rustup target add wasm32v1-none`)
+- Stellar CLI (`stellar`) - for contract deployment
+- A Stellar testnet account funded via [Friendbot](https://friendbot.stellar.org) or the [Stellar Lab](https://lab.stellar.org/account/create?network=testnet)
 
 ### 1. Clone and Install
 
@@ -86,9 +89,10 @@ cp frontend/.env.example frontend/.env
 Edit `.env` with your deployed contract address (see Deployment section):
 
 ```env
-VITE_CONTRACT_ADDRESS=CCYOURCONTRACTADDRESSHERE
 VITE_NETWORK=TESTNET
 VITE_RPC_URL=https://soroban-testnet.stellar.org
+VITE_CONTRACT_ADDRESS=CDLIRSHZJIA22GDE7M7JJ2PAUJ3OTLRH2UTVNXAGYSK3O5X4IXFIEZTC
+VITE_XLM_TOKEN_ADDRESS=CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC
 ```
 
 ### 3. Deploy the Smart Contract
@@ -101,7 +105,7 @@ stellar contract build
 
 # Deploy to testnet (replace with your funded account secret key)
 stellar contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/stellar_vault.wasm \
+  --wasm target/wasm32v1-none/release/stellar_vault.wasm \
   --source <YOUR_SECRET_KEY> \
   --network testnet
 
@@ -115,7 +119,7 @@ cd frontend
 npm run dev
 ```
 
-Open http://localhost:5173 in your browser.
+Open http://localhost:5173 in your browser, connect your wallet, and create your first commitment.
 
 ## 🧪 Smart Contract Interface
 
@@ -123,9 +127,9 @@ Open http://localhost:5173 in your browser.
 
 | Function | Parameters | Description |
 |---|---|---|
-| `create_vault` | `token, owner, description, required_check_ins, deadline, stake` | Create a vault and stake XLM |
-| `check_in` | `vault_id` | Record a daily check-in |
-| `settle_vault` | `vault_id, token, charity` | Settle after deadline (proportional return) |
+| `create_vault` | `token, owner, description, required_check_ins, deadline, stake, beneficiary, strict_penalty` | Create a commitment and stake XLM |
+| `check_in` | `vault_id` | Record a check-in before the deadline |
+| `settle_vault` | `vault_id, token` | Settle after deadline (proportional return; slashed funds go to beneficiary or are burned) |
 
 ### Read Functions
 
@@ -134,7 +138,7 @@ Open http://localhost:5173 in your browser.
 | `get_vault` | `vault_id` | `Vault` struct |
 | `get_user_vaults` | `user` | `Vec<u32>` (vault IDs) |
 | `get_user_stats` | `user` | `UserStats` struct |
-| `get_global_stats` | — | `(total_vaults, total_completed, total_staked, total_donated)` |
+| `get_global_stats` | - | `(total_vaults, total_completed, total_staked, total_donated)` |
 | `is_deadline_passed` | `vault_id` | `bool` |
 
 ### Events
@@ -147,7 +151,8 @@ Open http://localhost:5173 in your browser.
 
 ### Error Handling
 
-The contract handles these error conditions:
+The contract and frontend handle these error conditions:
+
 - `required_check_ins must be > 0`
 - `deadline must be in the future`
 - `stake must be > 0`
@@ -155,27 +160,53 @@ The contract handles these error conditions:
 - `vault already settled`
 - `deadline has passed`
 - `all required check-ins already done`
+- Wallet not detected (no extension installed)
+- Transaction rejected by user
+- Insufficient balance / underfunded operation
 
 ## 🖼 Screenshots
 
-<!-- Replace with your actual screenshots -->
-> Screenshot: Wallet connect modal showing available wallet options
-> Screenshot: Vault creation form with staking fields
-> Screenshot: Live event feed with check-in activity
+### 1. Wallet options (required by checklist)
+
+<img src="docs/screenshots/wallet-options.png" alt="Wallet options modal" width="600">
+
+Click **Connect Wallet** to see the available wallet extensions (Freighter, Lobstr, Albedo, Rabet, xBull, Hana).
+
+### 2. Connected dashboard
+
+<img src="docs/screenshots/dashboard.png" alt="Connected dashboard" width="600">
+
+Wallet connected: header with your address, the "Your Stats" row, the Create Commitment form, and the commitments list.
+
+### 3. Your commitments
+
+<img src="docs/screenshots/your-commitments.png" alt="Your commitments" width="600">
+
+Your commitments with progress, check-in status, and settle actions.
+
+### 4. Activity feed
+
+<img src="docs/screenshots/activity-feed.png" alt="Activity feed" width="600">
+
+Recent events after creating or checking in on commitments.
 
 ## 🔗 Deployed Contract
 
 - **Network:** Stellar Testnet
-- **Contract Address:** `CDL2L6HJCQGN3CGATTLZPSFZJD3J4CISBJV3UL74B43RFRA5TUSYTQIS`
-- **Explorer:** [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CDL2L6HJCQGN3CGATTLZPSFZJD3J4CISBJV3UL74B43RFRA5TUSYTQIS)
+- **Contract Address:** `CDLIRSHZJIA22GDE7M7JJ2PAUJ3OTLRH2UTVNXAGYSK3O5X4IXFIEZTC`
+- **Explorer:** [Stellar Expert](https://stellar.expert/explorer/testnet/contract/CDLIRSHZJIA22GDE7M7JJ2PAUJ3OTLRH2UTVNXAGYSK3O5X4IXFIEZTC)
+- **WASM size:** ~11.5 KB optimized
 
 ## 🔍 Transaction Hashes
 
 | Action | Hash |
 |---|---|
 | **Friendbot Fund** | `c244e2c72d77a6834eb93b5c77d6a1d352f6bb07b7ebd60ba7aac8c26d568467` |
-| **WASM Upload** | `483e400f0226837fa05b1d50ff45ce6b650d3ee31beda8a9f3cd5879893be736` |
-| **Contract Deploy** | `078534535a91273553f4ae6d4817aeb3e66ccad9a115eedc013b6478311d4dbd` |
+| **WASM Upload** | `483e400f0226837fa05b1d50ff45ce6b650d3ee31beda8a9f3cd5879893be736` (from an earlier contract deployment) |
+| **Contract Deploy** | `078534535a91273553f4ae6d4817aeb3e66ccad9a115eedc013b6478311d4dbd` (from an earlier contract deployment) |
+| **Contract Call (settle_vault)** | `80dfdd6d7da2a7bc3ee537454aee0822d51173f2965b1fd1c97c9c4c8fbe1417` (from an earlier contract deployment) |
+
+All verifiable on [Stellar Expert](https://stellar.expert/explorer/testnet). You can also capture your own contract-call hash: after creating or checking in on a commitment, open the "More Details" panel and click any transaction link.
 
 ## 🛠 Tech Stack
 

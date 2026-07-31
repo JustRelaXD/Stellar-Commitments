@@ -8,7 +8,7 @@ import {
   Address,
   BASE_FEE,
 } from '@stellar/stellar-sdk';
-import { RPC_URL, NETWORK_PASSPHRASE, CONTRACT_ADDRESS, XLM_TOKEN_ADDRESS, CHARITY_ADDRESS } from '../constants';
+import { RPC_URL, NETWORK_PASSPHRASE, CONTRACT_ADDRESS, XLM_TOKEN_ADDRESS } from '../constants';
 import type { Vault, UserStats, GlobalStats, TxState } from '../types';
 
 // ── ScVal conversion helpers ──────────────────────────────────────────
@@ -35,13 +35,15 @@ function rawToVault(vaultId: number, raw: any): { id: number; data: Vault } {
   return {
     id: vaultId,
     data: {
-      owner:        raw.owner?.toString() ?? '',
-      description:  raw.description?.toString() ?? '',
+      owner:              raw.owner?.toString() ?? '',
+      description:        raw.description?.toString() ?? '',
       required_check_ins: Number(raw.required_check_ins) || 0,
       check_in_count:     Number(raw.check_in_count) || 0,
-      deadline:     Number(raw.deadline) || 0,
-      stake:        Number(raw.stake) || 0,
-      settled:      Boolean(raw.settled),
+      deadline:           Number(raw.deadline) || 0,
+      stake:              Number(raw.stake) || 0,
+      settled:            Boolean(raw.settled),
+      beneficiary:        raw.beneficiary?.toString() ?? '',
+      strict_penalty:     Boolean(raw.strict_penalty),
     },
   };
 }
@@ -164,8 +166,7 @@ export function useContract(
         let returnValue: any;
         if (getResp.returnValue) {
           returnValue = scValToNative(getResp.returnValue);
-        }
-        setTxState({ status: 'success', hash: txHash });
+        }              setTxState({ status: 'success', hash: txHash });
         return { hash: txHash, returnValue };
       }
 
@@ -174,24 +175,28 @@ export function useContract(
       }
       throw new Error('Transaction timed out');
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Unknown error';
+      const msg = err instanceof Error ? err.message
+        : typeof err === 'string' ? err
+        : err && typeof err === 'object' && 'message' in err ? String((err as any).message)
+        : 'Unknown error';
       setTxState({ status: 'failed', error: classifyErr(msg) });
-      throw err;
+      // Normalize to Error before rethrowing
+      throw err instanceof Error ? err : new Error(msg);
     }
-  }, [walletAddress, signTransaction]);
-
-  // ── High-level convenience methods ────────────────────────────────
+  }, [walletAddress, signTransaction]);      // ── High-level convenience methods ────────────────────────────────
 
   const createVault = useCallback(async (
     description: string,
-    days: number,
+    durationSeconds: number,
     requiredCheckIns: number,
     stakeXlm: number,
-  ): Promise<number> => {
-    const deadline = Math.floor(Date.now() / 1000) + days * 86400;
+    beneficiary: string,
+    strictPenalty: boolean,
+  ): Promise<{ vaultId: number; hash: string }> => {
+    const deadline = Math.floor(Date.now() / 1000) + durationSeconds;
     const stakeStroops = BigInt(Math.floor(stakeXlm * 10_000_000));
 
-    const { returnValue: vaultId } = await write(
+    const { returnValue: vaultId, hash } = await write(
       'create_vault',
       addr(XLM_TOKEN_ADDRESS),
       addr(walletAddress),
@@ -199,16 +204,18 @@ export function useContract(
       u32(requiredCheckIns),
       u64(deadline),
       i128(stakeStroops),
+      addr(beneficiary),
+      nativeToScVal(strictPenalty, { type: 'bool' as any }),
     );
-    return Number(vaultId);
+    return { vaultId: Number(vaultId), hash };
   }, [walletAddress, write]);
 
-  const checkIn = useCallback(async (vaultId: number): Promise<void> => {
-    await write('check_in', u32(vaultId));
+  const checkIn = useCallback(async (vaultId: number): Promise<{ hash: string }> => {
+    return await write('check_in', u32(vaultId));
   }, [write]);
 
-  const settleVault = useCallback(async (vaultId: number): Promise<void> => {
-    await write('settle_vault', u32(vaultId), addr(XLM_TOKEN_ADDRESS), addr(CHARITY_ADDRESS));
+  const settleVault = useCallback(async (vaultId: number): Promise<{ hash: string }> => {
+    return await write('settle_vault', u32(vaultId), addr(XLM_TOKEN_ADDRESS));
   }, [write]);
 
   // ── Read convenience methods ──────────────────────────────────────

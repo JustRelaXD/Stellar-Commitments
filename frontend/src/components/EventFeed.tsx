@@ -8,33 +8,25 @@ interface EventFeedProps {
 
 const eventConfig = {
   vault_created: {
-    icon: '🔒',
-    label: 'Vault Created',
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/10 border-blue-500/20',
+    icon: <svg className="w-4 h-4 text-stellar-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+    label: 'Commitment Created',
+    bg: 'bg-stellar-500/5 border-stellar-500/10',
   },
   checked_in: {
-    icon: '✓',
+    icon: <svg className="w-4 h-4 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
     label: 'Checked In',
-    color: 'text-emerald-400',
-    bg: 'bg-emerald-500/10 border-emerald-500/20',
+    bg: 'bg-success/5 border-success/10',
   },
   vault_settled: {
-    icon: '⚖️',
-    label: 'Vault Settled',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/10 border-purple-500/20',
+    icon: <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>,
+    label: 'Commitment Settled',
+    bg: 'bg-amber-500/5 border-amber-500/10',
   },
 };
 
 export const EventFeed: React.FC<EventFeedProps> = ({ events, userAddress }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
-    }
-  }, [events.length]);
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [events.length]);
 
   const formatTime = (ts: number) => {
     const diff = Date.now() - ts;
@@ -44,78 +36,60 @@ export const EventFeed: React.FC<EventFeedProps> = ({ events, userAddress }) => 
     return `${Math.floor(diff / 86400000)}d ago`;
   };
 
-  if (events.length === 0) {
-    return (
-      <div className="card text-center py-8">
-        <svg className="w-10 h-10 text-gray-600 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.413a4.5 4.5 0 00-6.364 0L5.248 10.03a4.5 4.5 0 01-1.242 7.244 4.5 4.5 0 005.367-2.885" />
-        </svg>
-        <p className="text-gray-500 text-sm">No events yet</p>
-        <p className="text-gray-600 text-xs mt-1">Events will appear in real-time as vaults are created and check-ins happen</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="card">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold flex items-center gap-2">
-          <svg className="w-4 h-4 text-stellar-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-          Live Activity
-        </h3>
-        <span className="text-xs text-gray-500">{events.length} events</span>
+    <div className="border border-hairline-soft rounded-card p-5 bg-white">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-stellar-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+          <h3 className="text-sm font-semibold">Activity</h3>
+        </div>
+        <span className="text-[10px] text-mute">{events.length} events</span>
       </div>
-      <div ref={scrollRef} className="space-y-2 max-h-80 overflow-y-auto pr-1 custom-scrollbar">
-        {events.map((event, i) => {
-          const config = eventConfig[event.type] || eventConfig.vault_created;
-          const isUser = event.data.owner === userAddress ||
-            event.data.user === userAddress ||
-            String(event.data.owner || '').includes(userAddress);
 
-          return (
-            <div
-              key={`${event.txHash}-${i}`}
-              className={`animate-slide-up ${config.bg} border rounded-xl p-3 transition-all hover:bg-opacity-20 ${
-                isUser ? 'ring-1 ring-stellar-500/30' : ''
-              }`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="text-lg mt-0.5">{config.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold ${config.color}`}>{config.label}</span>
-                    {isUser && (
-                      <span className="text-[10px] px-1.5 py-0.5 bg-stellar-500/20 text-stellar-400 rounded-full">You</span>
-                    )}
+      {events.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-sm text-mute">No activity yet</p>
+          <p className="text-[10px] text-mute/60 mt-1">Commitment creation, check-ins, and settlements appear here</p>
+        </div>
+      ) : (
+        <div ref={scrollRef} className="space-y-1.5 max-h-80 overflow-y-auto">
+          {events.map((event, i) => {
+            const config = eventConfig[event.type] || eventConfig.vault_created;
+            const isUser = !!(userAddress && (
+              String(event.data.owner || '') === userAddress ||
+              String(event.data.user || '') === userAddress
+            ));
+            return (
+              <div key={`${event.txHash || i}-${i}`}
+                className={`${config.bg} border rounded-lg px-3 py-2.5 transition-all animate-fade-in ${isUser ? 'ring-1 ring-stellar-500/10' : ''}`}>
+                <div className="flex items-start gap-2.5">
+                  <div className="mt-0.5">{config.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium">{config.label}</span>
+                      {isUser && <span className="text-[9px] px-1.5 py-0.5 bg-stellar-500/10 text-stellar-600 rounded-pill">You</span>}
+                    </div>
+                    <p className="text-[11px] text-mute mt-0.5 truncate">{renderEventDescription(event)}</p>
+                    <p className="text-[9px] text-stone/60 mt-0.5">
+                      {formatTime(event.timestamp)}
+                      {event.txHash && ` · ${event.txHash.slice(0, 8)}...`}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5 truncate">
-                    {renderEventDescription(event)}
-                  </p>
-                  <p className="text-[10px] text-gray-600 mt-0.5">
-                    {formatTime(event.timestamp)}
-                    {event.txHash && ` · ${event.txHash.slice(0, 8)}...`}
-                  </p>
                 </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
 
 function renderEventDescription(event: ContractEvent): string {
   switch (event.type) {
-    case 'vault_created':
-      return `Vault #${event.data.vault_id} created with ${event.data.stake} XLM stake`;
-    case 'checked_in':
-      return `Vault #${event.data.vault_id} — Check-in ${event.data.count}/${event.data.required}`;
-    case 'vault_settled':
-      return `Vault #${event.data.vault_id} settled — returned ${event.data.returned} XLM`;
-    default:
-      return JSON.stringify(event.data);
+    case 'vault_created': return `Commitment #${event.data.vault_id} — ${event.data.stake} XLM staked`;
+    case 'checked_in': return `Commitment #${event.data.vault_id} — check-in ${event.data.count || ''}${event.data.required ? `/${event.data.required}` : ''}`;
+    case 'vault_settled': return `Commitment #${event.data.vault_id} — settled`;
+    default: return JSON.stringify(event.data);
   }
 }

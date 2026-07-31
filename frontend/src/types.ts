@@ -6,6 +6,8 @@ export interface Vault {
   deadline: number;
   stake: number;
   settled: boolean;
+  beneficiary: string;
+  strict_penalty: boolean;
 }
 
 export interface UserStats {

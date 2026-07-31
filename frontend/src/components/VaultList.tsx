@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { VaultCard } from './VaultCard';
+import { CubeIcon } from './CubeIcon';
 import type { Vault } from '../types';
 
 interface VaultListProps {
@@ -8,19 +9,15 @@ interface VaultListProps {
   onCheckIn: (vaultId: number) => Promise<void>;
   onSettle: (vaultId: number) => Promise<void>;
   isLoading: boolean;
+  txHashes: Record<number, { created?: string; checkIns: string[]; settled?: string }>;
 }
 
 type FilterType = 'all' | 'active' | 'settled';
 
 export const VaultList: React.FC<VaultListProps> = ({
-  vaults,
-  userAddress,
-  onCheckIn,
-  onSettle,
-  isLoading,
+  vaults, userAddress, onCheckIn, onSettle, isLoading, txHashes,
 }) => {
   const [filter, setFilter] = useState<FilterType>('all');
-
   const now = Date.now();
   const filtered = vaults.filter(({ data }) => {
     if (filter === 'active') return !data.settled && now <= data.deadline * 1000;
@@ -30,12 +27,13 @@ export const VaultList: React.FC<VaultListProps> = ({
 
   if (isLoading) {
     return (
-      <div className="card">
-        <div className="flex items-center justify-center py-12">
-          <svg className="animate-spin h-8 w-8 text-stellar-400" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+      <div className="border border-hairline-soft rounded-card p-5 bg-white">
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <svg className="animate-spin h-6 w-6 text-stellar-500" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
+          <p className="text-sm text-mute">Loading commitments from Stellar...</p>
         </div>
       </div>
     );
@@ -43,48 +41,51 @@ export const VaultList: React.FC<VaultListProps> = ({
 
   if (vaults.length === 0) {
     return (
-      <div className="card text-center py-12">
-        <svg className="w-12 h-12 text-gray-600 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-        <p className="text-gray-500">No vaults found</p>
-        <p className="text-sm text-gray-600 mt-1">Create your first vault to get started!</p>
+      <div className="border border-hairline-soft rounded-card p-5 bg-white text-center py-12 animate-fade-in">
+        <div className="w-14 h-14 rounded-full bg-stellar-500/5 border border-stellar-500/10 flex items-center justify-center mx-auto mb-4">
+          <CubeIcon className="w-7 h-7 text-stellar-400/40" strokeWidth={1} />
+        </div>
+        <h3 className="text-base font-semibold mb-1">No Commitments Yet</h3>
+        <p className="text-sm text-mute max-w-xs mx-auto leading-relaxed">
+          Create your first commitment above. Set a goal, stake XLM, and start earning it back through check-ins.
+        </p>
+        <div className="mt-4 flex items-center justify-center gap-4 text-xs text-mute">
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-stellar-400/50" />Set a goal</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-stellar-400/50" />Stake XLM</span>
+          <span className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-stellar-400/50" />Check in daily</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
-      {/* Filter tabs */}
-      <div className="flex gap-2 mb-4">
+    <div className="animate-fade-in">
+      <div className="flex gap-1.5 mb-4">
         {(['all', 'active', 'settled'] as FilterType[]).map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
-              filter === f
-                ? 'bg-stellar-500/20 text-stellar-400 border border-stellar-500/30'
-                : 'text-gray-500 hover:text-gray-300 border border-transparent'
-            }`}
-          >
+          <button key={f} onClick={() => setFilter(f)}
+            className={`px-4 py-1.5 rounded-pill text-xs font-medium transition-all ${
+              filter === f ? 'bg-ink text-white' : 'text-mute hover:text-ink'
+            }`}>
             {f.charAt(0).toUpperCase() + f.slice(1)}
-            {f === 'all' && ` (${vaults.length})`}
+            {f === 'all' && <span className="ml-1 text-[10px] opacity-60">{vaults.length}</span>}
           </button>
         ))}
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {filtered.map(({ id, data }) => (
-          <VaultCard
-            key={id}
-            vault={data}
-            vaultId={id}
-            isOwner={data.owner === userAddress}
-            onCheckIn={onCheckIn}
-            onSettle={onSettle}
-          />
-        ))}
-      </div>
+      {filtered.length === 0 ? (
+        <div className="border border-hairline-soft rounded-card p-5 bg-white text-center py-8">
+          <p className="text-sm text-mute">No {filter} commitments</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {filtered.map(({ id, data }) => (
+            <VaultCard key={id} vault={data} vaultId={id}
+              isOwner={data.owner === userAddress}
+              onCheckIn={onCheckIn} onSettle={onSettle}
+              txHashes={txHashes[id]} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };
