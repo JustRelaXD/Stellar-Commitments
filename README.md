@@ -4,6 +4,10 @@
 
 Stellar Commitment is a decentralized accountability app: you stake XLM on a goal, then prove your progress with on-chain check-ins before a deadline. Complete enough check-ins and your stake comes back. Miss your target and the unearned portion is slashed - sent to a beneficiary you choose, or burned if you leave it blank.
 
+## 🌐 Live Demo
+
+Try it live: **[stellar-commitments.vercel.app](https://stellar-commitments.vercel.app)**
+
 ## ✨ Features
 
 - **Create Commitments** - Set a goal, stake XLM, pick a duration (minutes, hours, or days), and define how many check-ins prove you stuck with it
@@ -16,18 +20,6 @@ Stellar Commitment is a decentralized accountability app: you stake XLM on a goa
 - **Activity Feed** - Watch commitment creations, check-ins, and settlements with transaction hashes
 - **Your Stats** - Per-wallet stats (commitments, completed, check-ins, staked, returned) - switch wallets and the numbers change
 - **Full Transparency** - "More Details" on every commitment: contract address, owner, beneficiary, create/check-in/settle transaction hashes, live contract balance, and the exact settlement breakdown (returned vs. slashed vs. burned)
-
-## 📋 Requirements
-
-| Requirement | Status |
-|---|---|
-| 3+ error types handled | ✅ Wallet not detected, tx rejected by user, insufficient balance, vault not found, deadline passed, already settled |
-| Contract deployed on testnet | ✅ See [Deployed Contract](#deployed-contract) |
-| Contract called from frontend | ✅ Via `@stellar/stellar-sdk` |
-| Transaction status visible | ✅ Toast with pending/success/failed states |
-| 2+ meaningful commits | ✅ See git log |
-| Multi-wallet integration | ✅ StellarWalletsKit (Freighter, Lobstr, Albedo, Rabet, xBull, Hana) |
-| Real-time event integration | ✅ Activity feed reflects on-chain events with verifiable tx hashes |
 
 ## 🏗 Architecture
 
@@ -123,7 +115,7 @@ Open http://localhost:5173 in your browser, connect your wallet, and create your
 
 ### 5. Deploy to Vercel (live demo)
 
-The frontend lives in the `frontend/` subdirectory, so Vercel needs to know where to build from. `rootDirectory` is **not** a valid `vercel.json` property, so configure it in the dashboard instead:
+Live at **https://stellar-commitments.vercel.app**. The frontend lives in the `frontend/` subdirectory, so Vercel needs to know where to build from. `rootDirectory` is **not** a valid `vercel.json` property, so configure it in the dashboard instead:
 
 1. Import this repo on [Vercel](https://vercel.com/new) (GitHub) - the import wizard lets you pick the **Root Directory** right there; otherwise set it in **Project Settings → General → Root Directory** as `frontend`
 2. Vercel auto-detects Vite (build: `tsc -b && vite build`, output: `dist/`). If the Framework Preset shows **Other**, set it to **Vite** manually and redeploy
@@ -215,6 +207,19 @@ Recent events after creating or checking in on commitments.
 | **Contract Call (settle_vault)** | `80dfdd6d7da2a7bc3ee537454aee0822d51173f2965b1fd1c97c9c4c8fbe1417` (from an earlier contract deployment) |
 
 All verifiable on [Stellar Expert](https://stellar.expert/explorer/testnet). You can also capture your own contract-call hash: after creating or checking in on a commitment, open the "More Details" panel and click any transaction link.
+
+## 📋 Requirements
+
+| Requirement | Status |
+|---|---|
+| 3+ error types handled | ✅ Wallet not detected, tx rejected by user, insufficient balance, vault not found, deadline passed, already settled |
+| Contract deployed on testnet | ✅ See [Deployed Contract](#deployed-contract) |
+| Contract called from frontend | ✅ Via `@stellar/stellar-sdk` |
+| Transaction status visible | ✅ Toast with pending/success/failed states |
+| 2+ meaningful commits | ✅ See git log |
+| Multi-wallet integration | ✅ StellarWalletsKit (Freighter, Lobstr, Albedo, Rabet, xBull, Hana) |
+| Real-time event integration | ✅ Activity feed reflects on-chain events with verifiable tx hashes |
+| Live demo (Vercel) | ✅ [stellar-commitments.vercel.app](https://stellar-commitments.vercel.app) |
 
 ## 🛠 Tech Stack
 
