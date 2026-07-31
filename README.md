@@ -121,6 +121,14 @@ npm run dev
 
 Open http://localhost:5173 in your browser, connect your wallet, and create your first commitment.
 
+### 5. Deploy to Vercel (live demo)
+
+The frontend lives in the `frontend/` subdirectory, so Vercel needs to know where to build from. `rootDirectory` is **not** a valid `vercel.json` property, so configure it in the dashboard instead:
+
+1. Import this repo on [Vercel](https://vercel.com/new) (GitHub) - the import wizard lets you pick the **Root Directory** right there; otherwise set it in **Project Settings → General → Root Directory** as `frontend`
+2. Vercel auto-detects Vite (build: `tsc -b && vite build`, output: `dist/`). If the Framework Preset shows **Other**, set it to **Vite** manually and redeploy
+3. Optional: add the env vars from `frontend/.env.example` in **Settings → Environment Variables** (the app has sensible defaults baked in, so this only matters when you redeploy with a new contract address)
+
 ## 🧪 Smart Contract Interface
 
 ### Write Functions
